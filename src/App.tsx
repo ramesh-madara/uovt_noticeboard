@@ -1,6 +1,6 @@
 // import { useState } from "react";
 import Home from "../src/pages/Home";
-
+import NoticesManager from "./pages/Fetch";
 // import "./App.css";
 
 function App() {
@@ -31,7 +31,7 @@ function App() {
       </p> */}
 
       <div>
-        <Home />
+        <NoticesManager />
       </div>
     </>
   );
