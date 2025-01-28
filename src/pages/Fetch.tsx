@@ -22,13 +22,25 @@ const NoticesManager: React.FC = () => {
     date: "",
     status: "active", // Default status is 'active'
   });
+  const [noNoticesMessage, setNoNoticesMessage] = useState<string | null>(null);
 
   // Fetch active notices
   useEffect(() => {
     fetch("http://ouvt-noticeboard.local/notices/active")
       .then((response) => response.json())
-      .then((data) => setNotices(data.data))
-      .catch((error) => console.error("Error fetching notices:", error));
+      .then((data) => {
+        if (data.error) {
+          setNoNoticesMessage(data.message); // Show the error message
+          setNotices([]); // No notices available
+        } else {
+          setNotices(data.data); // Set the fetched notices
+          setNoNoticesMessage(null); // Clear the error message if notices are found
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching notices:", error);
+        setNoNoticesMessage("Error fetching notices.");
+      });
   }, []);
 
   // Handle form input changes
@@ -45,19 +57,30 @@ const NoticesManager: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prepare form data excluding start_date and end_date
-    const { start_date, end_date, ...submitData } = formData;
+    // Prepare the form data for submission, including start_date, end_date, and status
+    const { start_date, end_date, status, ...submitData } = formData;
+
+    // Ensure the data to be sent includes start_date, end_date, and status
+    const formDataForSubmission = new URLSearchParams(submitData as any);
+    formDataForSubmission.append("start_date", start_date);
+    formDataForSubmission.append("end_date", end_date);
+    formDataForSubmission.append("status", status);
 
     fetch("http://ouvt-noticeboard.local/notices/insert", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams(submitData as any),
+      body: formDataForSubmission, // Send the updated form data
     })
       .then((response) => response.json())
       .then((data) => {
         if (!data.error) {
           alert("Notice added successfully!");
-          setNotices([...notices, { id: Date.now().toString(), ...formData }]);
+
+          // Update the notices state with the new notice immediately
+          const newNotice = { id: Date.now().toString(), ...formData };
+          setNotices([newNotice, ...notices]); // Prepend the new notice to the list of notices
+
+          // Clear the form after successful submission
           setFormData({
             title: "",
             content: "",
@@ -81,53 +104,133 @@ const NoticesManager: React.FC = () => {
         <section className="p-4 bg-gray-100 rounded-xl shadow">
           <h2 className="text-xl font-bold mb-4">Create Notice</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="text"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              placeholder="Title"
-              className="w-full p-2 border rounded"
-              required
-            />
-            <textarea
-              name="content"
-              value={formData.content}
-              onChange={handleInputChange}
-              placeholder="Content"
-              className="w-full p-2 border rounded"
-              required
-            />
-            <select
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              required
-            >
-              <option value="">Select Type</option>
-              <option value="info">Info</option>
-              <option value="warning">Warning</option>
-              <option value="alert">Alert</option>
-            </select>
-            <input
-              type="date"
-              name="date"
-              value={formData.date}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              required
-            />
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleInputChange}
-              className="w-full p-2 border rounded"
-              required
-            >
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
+            <div>
+              <label
+                htmlFor="title"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Title
+              </label>
+              <input
+                type="text"
+                name="title"
+                id="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                placeholder="Enter notice title"
+                className="w-full p-2 border rounded"
+                required
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="content"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Content
+              </label>
+              <textarea
+                name="content"
+                id="content"
+                value={formData.content}
+                onChange={handleInputChange}
+                placeholder="Enter notice content"
+                className="w-full p-2 border rounded"
+                required
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="type"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Type
+              </label>
+              <select
+                name="type"
+                id="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded"
+                required
+              >
+                <option value="">Select Type</option>
+                <option value="info">Info</option>
+                <option value="warning">Warning</option>
+                <option value="warning">Deadline</option>
+                <option value="alert">Event</option>
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="start_date"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Start Date
+              </label>
+              <input
+                type="date"
+                name="start_date"
+                id="start_date"
+                value={formData.start_date}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded"
+                required
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="end_date"
+                className="block text-sm font-medium text-gray-700"
+              >
+                End Date
+              </label>
+              <input
+                type="date"
+                name="end_date"
+                id="end_date"
+                value={formData.end_date}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded"
+                required
+              />
+            </div>
+            {/* <div>
+              <label
+                htmlFor="date"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Notice Date
+              </label>
+              <input
+                type="date"
+                name="date"
+                id="date"
+                value={formData.date}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded"
+                required
+              />
+            </div> */}
+            <div>
+              <label
+                htmlFor="status"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Status
+              </label>
+              <select
+                name="status"
+                id="status"
+                value={formData.status}
+                onChange={handleInputChange}
+                className="w-full p-2 border rounded"
+                required
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </div>
             <button
               type="submit"
               className="px-4 py-2 bg-blue-500 text-white rounded"
@@ -140,15 +243,17 @@ const NoticesManager: React.FC = () => {
         {/* View Notices Section */}
         <section className="p-4 bg-gray-100 rounded-xl shadow">
           <h2 className="text-xl font-bold mb-4">Active Notices</h2>
-          {notices.length > 0 ? (
+          {noNoticesMessage ? (
+            <p className="text-gray-500">{noNoticesMessage}</p> // Show the error message
+          ) : notices.length > 0 ? (
             <ul className="space-y-4">
               {notices.map((notice) => (
                 <li key={notice.id} className="p-4 border rounded bg-white">
                   <h3 className="font-bold text-lg">{notice.title}</h3>
                   <p>{notice.content}</p>
                   <p className="text-sm text-gray-500">
-                    Type: {notice.type} | Start Date: {notice.start_date} | End
-                    Date: {notice.end_date}
+                    Type: {notice.type} | Date: {notice.date}
+                    {/* Do not show start_date and end_date */}
                   </p>
                 </li>
               ))}
