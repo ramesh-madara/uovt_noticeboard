@@ -1,6 +1,8 @@
 // import { useState } from "react";
 import Home from "../src/pages/Home";
-
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Admin from "./pages/Admin";
+import Login from "./pages/Login";
 // import "./App.css";
 
 function App() {
@@ -30,9 +32,13 @@ function App() {
         Click on the Vite and React logos to learn more
       </p> */}
 
-      <div>
-        <Home />
-      </div>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Home />}></Route>
+          <Route path="/login" element={<Login />}></Route>
+          <Route path="/admin" element={<Admin />}></Route>
+        </Routes>
+      </BrowserRouter>
     </>
   );
 }
