@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import process from "process";
 
 interface Notice {
   id: string;
@@ -24,10 +25,10 @@ const NoticesManager: React.FC = () => {
   });
   const [noNoticesMessage, setNoNoticesMessage] = useState<string | null>(null);
   const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
-
+  const apiUrl = import.meta.env.VITE_API_BASE_URL;
   // Fetch active notices
   useEffect(() => {
-    fetch("http://ouvt-noticeboard.local/notices/active")
+    fetch(`${apiUrl}/notices/active`)
       .then((response) => response.json())
       .then((data) => {
         console.log("Fetched notices:", data); // Debugging the response
@@ -65,14 +66,11 @@ const NoticesManager: React.FC = () => {
     formDataForSubmission.append("status", status);
 
     try {
-      const response = await fetch(
-        "http://ouvt-noticeboard.local/notices/insert",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: formDataForSubmission,
-        }
-      );
+      const response = await fetch(`${apiUrl}/notices/insert`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formDataForSubmission,
+      });
 
       const data = await response.json();
       console.log("API Response:", data); // Debugging
@@ -107,7 +105,7 @@ const NoticesManager: React.FC = () => {
       "Are you sure you want to delete this notice?"
     );
     if (confirmDelete) {
-      fetch(`http://ouvt-noticeboard.local/notices/delete/${id}`, {
+      fetch(`${apiUrl}/notices/delete/${id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
       })
@@ -150,7 +148,7 @@ const NoticesManager: React.FC = () => {
     formDataForSubmission.append("end_date", end_date);
     formDataForSubmission.append("status", status);
 
-    fetch(`http://ouvt-noticeboard.local/notices/update/${editingNotice.id}`, {
+    fetch(`${apiUrl}/notices/update/${editingNotice.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: formDataForSubmission,
