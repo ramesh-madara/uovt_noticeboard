@@ -23,12 +23,14 @@ const NoticesManager: React.FC = () => {
     status: "active", // Default status is 'active'
   });
   const [noNoticesMessage, setNoNoticesMessage] = useState<string | null>(null);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
 
   // Fetch active notices
   useEffect(() => {
     fetch("http://ouvt-noticeboard.local/notices/active")
       .then((response) => response.json())
       .then((data) => {
+        console.log("Fetched notices:", data); // Debugging the response
         if (data.error) {
           setNoNoticesMessage(data.message); // Show the error message
           setNotices([]); // No notices available
@@ -53,34 +55,120 @@ const NoticesManager: React.FC = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  // Submit new notice
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prepare the form data for submission, including start_date, end_date, and status
     const { start_date, end_date, status, ...submitData } = formData;
-
-    // Ensure the data to be sent includes start_date, end_date, and status
     const formDataForSubmission = new URLSearchParams(submitData as any);
     formDataForSubmission.append("start_date", start_date);
     formDataForSubmission.append("end_date", end_date);
     formDataForSubmission.append("status", status);
 
-    fetch("http://ouvt-noticeboard.local/notices/insert", {
-      method: "POST",
+    try {
+      const response = await fetch(
+        "http://ouvt-noticeboard.local/notices/insert",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: formDataForSubmission,
+        }
+      );
+
+      const data = await response.json();
+      console.log("API Response:", data); // Debugging
+
+      if (!data.error) {
+        alert("Notice added successfully!");
+
+        // **Update the UI instantly**
+        setNotices((prevNotices) => [data.data, ...prevNotices]);
+
+        // Reset the form
+        setFormData({
+          title: "",
+          content: "",
+          type: "",
+          start_date: "",
+          end_date: "",
+          date: "",
+          status: "active",
+        });
+      } else {
+        alert("Error adding notice.");
+      }
+    } catch (error) {
+      console.error("Error adding notice:", error);
+    }
+  };
+
+  // Handle Delete Notice with Confirmation
+  const handleDelete = (id: string) => {
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete this notice?"
+    );
+    if (confirmDelete) {
+      fetch(`http://ouvt-noticeboard.local/notices/delete/${id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      })
+        .then((response) => response.json())
+        .then((data) => {
+          if (!data.error) {
+            alert("Notice deleted successfully.");
+            setNotices(notices.filter((notice) => notice.id !== id)); // Remove deleted notice from state
+          } else {
+            alert("Error deleting notice.");
+          }
+        })
+        .catch((error) => console.error("Error deleting notice:", error));
+    }
+  };
+
+  // Handle Edit (Update) Notice
+  const handleEdit = (notice: Notice) => {
+    setEditingNotice(notice);
+    setFormData({
+      title: notice.title,
+      content: notice.content,
+      type: notice.type,
+      start_date: notice.start_date,
+      end_date: notice.end_date,
+      date: notice.date,
+      status: notice.status,
+    });
+  };
+
+  // Submit the Update (PUT) request
+  const handleUpdateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!editingNotice) return;
+
+    const { start_date, end_date, status, ...submitData } = formData;
+    const formDataForSubmission = new URLSearchParams(submitData as any);
+    formDataForSubmission.append("start_date", start_date);
+    formDataForSubmission.append("end_date", end_date);
+    formDataForSubmission.append("status", status);
+
+    fetch(`http://ouvt-noticeboard.local/notices/update/${editingNotice.id}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: formDataForSubmission, // Send the updated form data
+      body: formDataForSubmission,
     })
       .then((response) => response.json())
       .then((data) => {
         if (!data.error) {
-          alert("Notice added successfully!");
+          alert("Notice updated successfully!");
 
-          // Update the notices state with the new notice immediately
-          const newNotice = { id: Date.now().toString(), ...formData };
-          setNotices([newNotice, ...notices]); // Prepend the new notice to the list of notices
-
-          // Clear the form after successful submission
+          // Update the notice in the state
+          setNotices(
+            notices.map((notice) =>
+              notice.id === editingNotice.id
+                ? { ...notice, ...formData }
+                : notice
+            )
+          );
+          setEditingNotice(null); // Close the edit modal
           setFormData({
             title: "",
             content: "",
@@ -88,13 +176,13 @@ const NoticesManager: React.FC = () => {
             start_date: "",
             end_date: "",
             date: "",
-            status: "active", // Reset to default status after submission
+            status: "active",
           });
         } else {
-          alert("Error adding notice.");
+          alert("Error updating notice.");
         }
       })
-      .catch((error) => console.error("Error adding notice:", error));
+      .catch((error) => console.error("Error updating notice:", error));
   };
 
   return (
@@ -157,7 +245,7 @@ const NoticesManager: React.FC = () => {
                 <option value="">Select Type</option>
                 <option value="info">Info</option>
                 <option value="warning">Warning</option>
-                <option value="warning">Deadline</option>
+                <option value="deadline">Deadline</option>
                 <option value="alert">Event</option>
               </select>
             </div>
@@ -195,23 +283,6 @@ const NoticesManager: React.FC = () => {
                 required
               />
             </div>
-            {/* <div>
-              <label
-                htmlFor="date"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Notice Date
-              </label>
-              <input
-                type="date"
-                name="date"
-                id="date"
-                value={formData.date}
-                onChange={handleInputChange}
-                className="w-full p-2 border rounded"
-                required
-              />
-            </div> */}
             <div>
               <label
                 htmlFor="status"
@@ -244,25 +315,177 @@ const NoticesManager: React.FC = () => {
         <section className="p-4 bg-gray-100 rounded-xl shadow">
           <h2 className="text-xl font-bold mb-4">Active Notices</h2>
           {noNoticesMessage ? (
-            <p className="text-gray-500">{noNoticesMessage}</p> // Show the error message
+            <p className="text-gray-500">{noNoticesMessage}</p>
           ) : notices.length > 0 ? (
             <ul className="space-y-4">
-              {notices.map((notice) => (
-                <li key={notice.id} className="p-4 border rounded bg-white">
-                  <h3 className="font-bold text-lg">{notice.title}</h3>
-                  <p>{notice.content}</p>
-                  <p className="text-sm text-gray-500">
-                    Type: {notice.type} | Date: {notice.date}
-                    {/* Do not show start_date and end_date */}
-                  </p>
-                </li>
-              ))}
+              {notices.map((notice) =>
+                notice ? (
+                  <li key={notice.id} className="p-4 border rounded bg-white">
+                    <h3 className="font-bold text-lg">{notice.title}</h3>
+                    <p>{notice.content}</p>
+                    <p className="text-sm text-gray-500">
+                      Type: {notice.type} | Start : {notice.start_date} | End :{" "}
+                      {notice.end_date}
+                    </p>
+                    {/* orange text */}
+                    <p className="bg-green-500 text-white px-2 py-1 w-[80px] rounded">
+                      <b>{notice.status}</b>
+                    </p>
+
+                    <div className="flex space-x-2 mt-4">
+                      <button
+                        onClick={() => handleEdit(notice)}
+                        className="px-4 py-2 bg-yellow-500 text-white rounded"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(notice.id)}
+                        className="px-4 py-2 bg-red-500 text-white rounded"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ) : null
+              )}
             </ul>
           ) : (
             <p>No active notices available.</p>
           )}
         </section>
       </div>
+
+      {/* Update Notice Modal */}
+      {editingNotice && (
+        <div className="fixed inset-0 flex justify-center items-center backdrop-blur-sm bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h2 className="text-xl font-bold mb-4">Edit Notice</h2>
+            <form onSubmit={handleUpdateSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="title"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Title
+                </label>
+                <input
+                  type="text"
+                  name="title"
+                  id="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="content"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Content
+                </label>
+                <textarea
+                  name="content"
+                  id="content"
+                  value={formData.content}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="type"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Type
+                </label>
+                <select
+                  name="type"
+                  id="type"
+                  value={formData.type}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                  required
+                >
+                  <option value="info">Info</option>
+                  <option value="warning">Warning</option>
+                  <option value="deadline">Deadline</option>
+                  <option value="alert">Event</option>
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="start_date"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  name="start_date"
+                  id="start_date"
+                  value={formData.start_date}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="end_date"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  name="end_date"
+                  id="end_date"
+                  value={formData.end_date}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="status"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Status
+                </label>
+                <select
+                  name="status"
+                  id="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full p-2 border rounded"
+                  required
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-500 text-white rounded"
+              >
+                Update
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingNotice(null)}
+                className="px-4 py-2 bg-gray-500 text-white rounded"
+              >
+                Cancel
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
